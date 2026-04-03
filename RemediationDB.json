@@ -1,26 +1,757 @@
 {
+  "Version": "2026.04.03",
+  "TotalEntries": 45,
   "Remediaciones": [
     {
-      "ID": "EXECUTION_POLICY_BYPASS",
-      "HumanDescription": "El historial de PowerShell (o procesos activos) demuestra el uso del patrón 'ExecutionPolicy bypass'. Esto permite saltarse las protecciones de ejecución de scripts firmados en Windows y es una técnica típica de atacantes (ATT&CK T1059.001) para correr malware en memoria.",
+      "ID": "NETD_LLMNR_ENABLED",
+      "Category": "Red",
+      "Severity": "High",
+      "HumanDescription": "Tu PC anuncia su nombre en la red WiFi de una manera anticuada. Esto permite que otro dispositivo en la misma red se haga pasar por tu router y capture tus contrasenas cuando inicias sesion en sitios web.",
+      "HumanImpact": "En una cafeteria, oficina o cualquier WiFi compartida, alguien con un portatil puede interceptar tus contrasenas. Riesgo de robo de identidad.",
       "FixSteps": [
-        "Revisar historial: Get-Content $env:APPDATA\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt",
-        "Si no reconoces el comando ejecutado, podrías estar comprometido. Limpia el historial.",
-        "Cambiar las contraseñas guardadas en los navegadores si se sospecha filtración."
+        "Abrir el Editor de Registro (regedit.exe) como administrador.",
+        "Navegar a: HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient",
+        "Crear un valor DWORD llamado 'EnableMulticast' y establecerlo a 0."
       ],
-      "FixCommand": "Get-Content \"$env:APPDATA\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt\" | Select-String -Pattern 'Invoke-Expression|IEX|DownloadString|-enc|bypass'",
-      "FixDifficulty": "Hard",
+      "FixCommand": "New-Item -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\DNSClient' -Force | New-ItemProperty -Name 'EnableMulticast' -Value 0 -PropertyType DWORD -Force",
+      "FixDifficulty": "Medium",
+      "MitreTechnique": "T1557.001",
       "Safe": true
     },
     {
       "ID": "NETD_NETBIOS_ENABLED",
-      "HumanDescription": "NetBIOS es una tecnología de red de los años 90 que Windows sigue usando. Es como dejar una puerta trasera abierta en tu router permitiendo descubrimiento en red de forma insegura.",
+      "Category": "Red",
+      "Severity": "Medium",
+      "HumanDescription": "NetBIOS es una tecnologia de red de los anos 90 que Windows sigue usando. Es como dejar una puerta trasera abierta en tu router permitiendo descubrimiento en red de forma insegura.",
+      "HumanImpact": "Permite que otros equipos de tu red descubran tu PC y accedan a recursos compartidos sin autorizacion explicita.",
       "FixSteps": [
-        "Desactivar NetBIOS en la configuración del adaptador de red (WINS).",
-        "Modificar la clave de registro de NetBT en Tcpip."
+        "Ir a Panel de Control > Centro de redes y recursos compartidos > Cambiar configuracion del adaptador.",
+        "Clic derecho en el adaptador de red > Propiedades > TCP/IPv4 > Propiedades > Avanzado > pestana WINS.",
+        "Seleccionar 'Deshabilitar NetBIOS sobre TCP/IP'."
       ],
       "FixCommand": "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Services\\NetBT\\Parameters' -Name 'NodeType' -Value 2",
       "FixDifficulty": "Medium",
+      "MitreTechnique": "T1046",
+      "Safe": true
+    },
+    {
+      "ID": "LAT_SMB_SIGNING_OFF",
+      "Category": "Red",
+      "Severity": "High",
+      "HumanDescription": "Cuando tu PC se comunica con otros equipos de la red para compartir archivos, no firma digitalmente esos mensajes. Un atacante en la misma red puede interceptar la comunicacion y hacerse pasar por ti.",
+      "HumanImpact": "Permite ataques NTLM Relay: el atacante puede tomar el control de tu sesion de red y acceder a recursos compartidos con tu identidad.",
+      "FixSteps": [
+        "Abrir Editor de Politica de Grupo Local (gpedit.msc).",
+        "Navegar a: Configuracion de equipo > Configuracion de Windows > Configuracion de seguridad > Opciones de seguridad.",
+        "Activar 'Cliente de redes de Microsoft: firmar las comunicaciones digitalmente (siempre)'."
+      ],
+      "FixCommand": "Set-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\LanmanWorkstation\\Parameters' -Name 'RequireSecuritySignature' -Value 1",
+      "FixDifficulty": "Medium",
+      "MitreTechnique": "T1557",
+      "Safe": true
+    },
+    {
+      "ID": "CORR_RELAY_ATTACK_READY",
+      "Category": "Correlacion",
+      "Severity": "Critical",
+      "HumanDescription": "Tu PC tiene una combinacion de configuraciones que, juntas, forman el escenario perfecto para que alguien en tu misma red WiFi capture tus credenciales de Windows en segundos.",
+      "HumanImpact": "Un atacante con herramientas gratuitas (Responder, ntlmrelayx) puede conseguir tu hash de contrasena de Windows en menos de 5 minutos mientras navegas normalmente.",
+      "FixSteps": [
+        "PASO 1: Desactivar LLMNR en el Registro (EnableMulticast = 0).",
+        "PASO 2: Desactivar NetBIOS en la configuracion del adaptador de red.",
+        "PASO 3: Activar SMB Signing en la politica de seguridad local."
+      ],
+      "FixCommand": "Start-Process gpedit.msc",
+      "FixDifficulty": "Hard",
+      "MitreTechnique": "T1557",
+      "Safe": true
+    },
+    {
+      "ID": "CRED_SAM_WEAK_ACL",
+      "Category": "Credenciales",
+      "Severity": "High",
+      "HumanDescription": "El archivo SAM de Windows guarda las contrasenas de todas las cuentas locales de tu PC en formato cifrado. Cualquier programa que se ejecute puede leerlo.",
+      "HumanImpact": "Un virus puede copiar ese archivo y con Hashcat descifrar tu contrasena en minutos si no es larga o compleja.",
+      "FixSteps": [
+        "Activar Windows Defender Credential Guard si tu hardware lo soporta.",
+        "Asegurarse de que el Antivirus este activo y actualizado.",
+        "Usar una contrasena larga y compleja (+12 caracteres, mayusculas, numeros, simbolos)."
+      ],
+      "FixCommand": "Start-Process ms-settings:windowssecurity",
+      "FixDifficulty": "Hard",
+      "Safe": true
+    },
+    {
+      "ID": "CRED_GUARD_DISABLED",
+      "Category": "Credenciales",
+      "Severity": "High",
+      "HumanDescription": "Credential Guard es una caja fuerte virtual dentro de Windows que protege tus credenciales guardandolas en una zona de memoria que ni los virus pueden tocar. Ahora mismo esa caja fuerte esta apagada.",
+      "HumanImpact": "Si un malware llega a ejecutarse, puede robar tus credenciales de sesion activas desde la RAM. Es lo que usa el celebre malware Mimikatz.",
+      "FixSteps": [
+        "Verificar que tienes TPM 2.0 y Secure Boot activados.",
+        "Abrir Configuracion > Privacidad y seguridad > Seguridad de Windows > Seguridad del dispositivo.",
+        "Activar 'Aislamiento del nucleo' y 'Integridad de la memoria'."
+      ],
+      "FixCommand": "Start-Process ms-settings:windowssecurity",
+      "FixDifficulty": "Hard",
+      "Safe": true
+    },
+    {
+      "ID": "CRED_EXCESSIVE_CACHED_LOGONS",
+      "Category": "Credenciales",
+      "Severity": "Medium",
+      "HumanDescription": "Windows guarda copias de tus credenciales de dominio en el disco. Tienes guardadas mas copias de las necesarias. Si alguien roba el disco, puede intentar descifrarlas.",
+      "HumanImpact": "Acceso potencial a credenciales corporativas si el disco fisico es robado.",
+      "FixSteps": [
+        "Abrir secpol.msc (Politica de seguridad local).",
+        "Ir a Politicas locales > Opciones de seguridad.",
+        "Buscar 'Inicio de sesion interactivo: numero de inicios de sesion previos en cache' y reducirlo a 1 o 2."
+      ],
+      "FixCommand": "Start-Process secpol.msc",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "DP_BITLOCKER_OFF",
+      "Category": "Cifrado",
+      "Severity": "High",
+      "HumanDescription": "Tu disco duro no tiene cifrado. Todos tus archivos, fotos, documentos y contrasenas guardadas estan en texto plano en el disco.",
+      "HumanImpact": "Si te roban el portatil, cualquier persona puede conectarlo a otro PC y leer todos tus archivos sin necesitar tu contrasena de Windows. En 5 minutos tienen acceso a todo.",
+      "FixSteps": [
+        "Abrir Panel de Control > Sistema y Seguridad > Cifrado de unidad BitLocker.",
+        "Hacer clic en 'Activar BitLocker' en la unidad C:.",
+        "Seguir el asistente: guardar la clave de recuperacion en tu cuenta de Microsoft o en un USB."
+      ],
+      "FixCommand": "Start-Process 'control.exe' -ArgumentList '/name Microsoft.BitLockerDriveEncryption'",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "BOOT_NO_BITLOCKER",
+      "Category": "Cifrado",
+      "Severity": "High",
+      "HumanDescription": "El disco donde esta instalado Windows (C:) no tiene cifrado BitLocker activo. Si alguien accede fisicamente a tu PC, puede leer todo sin contrasena.",
+      "HumanImpact": "Acceso fisico al disco = acceso total a todos los datos sin autenticacion.",
+      "FixSteps": [
+        "Panel de Control > Sistema y Seguridad > Cifrado de unidad BitLocker.",
+        "Activar BitLocker en C:.",
+        "Guardar la clave de recuperacion en un lugar seguro."
+      ],
+      "FixCommand": "Start-Process 'control.exe' -ArgumentList '/name Microsoft.BitLockerDriveEncryption'",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "WU_OS_EOL",
+      "Category": "Actualizaciones",
+      "Severity": "Critical",
+      "HumanDescription": "Tu version de Windows ya no recibe actualizaciones de seguridad. Es como vivir en una casa cuya cerradura ya no tiene recambios: cuando alguien descubre como abrirla, nadie fabricara una nueva.",
+      "HumanImpact": "Los hackers publican exploits para versiones sin soporte porque las victimas no pueden parchear el problema. Tu PC es un objetivo facil.",
+      "FixSteps": [
+        "Comprobar si tu hardware soporta Windows 11 usando la herramienta 'PC Health Check' de Microsoft.",
+        "Si es compatible: Configuracion > Windows Update > Buscar actualizaciones.",
+        "Si no es compatible: considerar instalar una version de Windows 10 con soporte activo."
+      ],
+      "FixCommand": "Start-Process ms-settings:windowsupdate",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "PRIV_CORTANA_LOCKSCREEN",
+      "Category": "Privacidad",
+      "Severity": "Low",
+      "HumanDescription": "Cortana puede activarse desde la pantalla de bloqueo sin introducir la contrasena. En algunos casos esto ha permitido saltarse la pantalla de bloqueo o acceder a informacion del sistema.",
+      "HumanImpact": "Riesgo bajo en casa, significativo en entornos de oficina con acceso fisico de terceros.",
+      "FixSteps": [
+        "Abrir Configuracion > Cortana.",
+        "Desactivar 'Permitir que Cortana responda cuando el dispositivo este bloqueado'."
+      ],
+      "FixCommand": "Start-Process ms-settings:cortana",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "PRIV_TELEMETRY_HIGH",
+      "Category": "Privacidad",
+      "Severity": "Low",
+      "HumanDescription": "Windows esta enviando a Microsoft informacion sobre como usas tu PC: aplicaciones que abres, errores, paginas visitadas. El nivel de telemetria esta en el maximo.",
+      "HumanImpact": "Privacidad reducida. En entornos corporativos, puede ser un problema legal (RGPD).",
+      "FixSteps": [
+        "Abrir Configuracion > Privacidad > Diagnostico y comentarios.",
+        "Cambiar de 'Completo' a 'Basico' o 'Requerido'."
+      ],
+      "FixCommand": "Start-Process ms-settings:privacy-feedback",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "PRIV_ACTIVITY_HISTORY",
+      "Category": "Privacidad",
+      "Severity": "Low",
+      "HumanDescription": "Windows guarda un historial de todo lo que haces en el PC y lo puede sincronizar con Microsoft. Cualquier persona con acceso a tu cuenta de Microsoft puede ver tu historial desde otro dispositivo.",
+      "HumanImpact": "Exposicion de habitos de uso y documentos abiertos a traves de la cuenta de Microsoft.",
+      "FixSteps": [
+        "Abrir Configuracion > Privacidad > Historial de actividad.",
+        "Desmarcar ambas opciones.",
+        "Hacer clic en 'Borrar' para limpiar el historial acumulado."
+      ],
+      "FixCommand": "Start-Process ms-settings:privacy-activityhistory",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "ACCT_NO_LOCKOUT",
+      "Category": "Cuentas",
+      "Severity": "Medium",
+      "HumanDescription": "Tu PC permite intentar la contrasena infinitas veces sin bloquearse. Un atacante puede probar miles de contrasenas automaticamente sin limitacion de tiempo.",
+      "HumanImpact": "Ataques de diccionario contra la pantalla de inicio de sesion son posibles sin restriccion.",
+      "FixSteps": [
+        "Abrir secpol.msc > Politicas de cuenta > Politica de bloqueo de cuenta.",
+        "Establecer 'Umbral de bloqueo de cuenta' a 5 intentos.",
+        "Establecer 'Duracion de bloqueo de cuenta' a 30 minutos."
+      ],
+      "FixCommand": "Start-Process secpol.msc",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "ACCT_WEAK_PWD_POLICY",
+      "Category": "Cuentas",
+      "Severity": "Medium",
+      "HumanDescription": "Windows no te obliga a usar una contrasena con longitud minima. Actualmente podria existir una cuenta con contrasena de 1 caracter o incluso sin contrasena.",
+      "HumanImpact": "Las contrasenas cortas se pueden descifrar en segundos con herramientas automatizadas.",
+      "FixSteps": [
+        "Abrir secpol.msc > Politicas de cuenta > Politica de contrasenas.",
+        "Establecer 'Longitud minima de la contrasena' a 8 caracteres.",
+        "Activar 'La contrasena debe cumplir los requisitos de complejidad'."
+      ],
+      "FixCommand": "Start-Process secpol.msc",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "AUDIT_PS_SBL_DISABLED",
+      "Category": "Auditoria",
+      "Severity": "Medium",
+      "HumanDescription": "Nadie esta grabando lo que se ejecuta en PowerShell. Si un virus usa PowerShell para hacer dano, no habra rastro alguno. Los malware modernos usan PowerShell intensamente por este motivo.",
+      "HumanImpact": "Sin logging de PowerShell, es muy dificil saber que paso despues de un incidente de seguridad.",
+      "FixSteps": [
+        "Abrir Editor de Politica de Grupo Local (gpedit.msc).",
+        "Ir a: Configuracion > Plantillas administrativas > Componentes de Windows > PowerShell.",
+        "Activar 'Activar el registro de bloques de script'."
+      ],
+      "FixCommand": "New-Item -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\PowerShell\\ScriptBlockLogging' -Force | Set-ItemProperty -Name 'EnableScriptBlockLogging' -Value 1",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "AUDIT_PROCESS_DISABLED",
+      "Category": "Auditoria",
+      "Severity": "Low",
+      "HumanDescription": "Windows puede registrar cada programa que se abre (Event 4688). Ahora mismo ese registro esta desactivado. Si algo malo ocurre, no habra evidencia de que programas se ejecutaron.",
+      "HumanImpact": "Sin registro de procesos, es imposible saber que se ejecuto durante un ataque.",
+      "FixSteps": [
+        "secpol.msc > Politicas de auditoria avanzada > Seguimiento detallado.",
+        "Activar 'Auditoria de creacion de procesos' > Exito."
+      ],
+      "FixCommand": "Start-Process secpol.msc",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "HEALTH_UNEXPECTED_SHUTDOWN",
+      "Category": "Hardware",
+      "Severity": "Medium",
+      "HumanDescription": "Tu PC se ha apagado de forma brusca varias veces en el ultimo mes (Kernel-Power 41). Cada apagado brusco puede corromper archivos y es senal de que algun componente esta fallando.",
+      "HumanImpact": "Los apagados bruscos frecuentes pueden danar el sistema de archivos del disco e indicar un fallo de hardware inminente.",
+      "FixSteps": [
+        "Descargar HWiNFO64 (gratis) y monitorizar temperaturas de CPU y GPU bajo carga.",
+        "Si la temperatura supera 90C: limpiar el polvo o revisar el sistema de refrigeracion.",
+        "Ejecutar 'chkdsk C: /scan' para ver si el disco tiene sectores malos."
+      ],
+      "FixCommand": "Start-Process 'chkdsk.exe' -ArgumentList 'C: /scan' -Verb RunAs",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "BOOT_SLOW",
+      "Category": "Rendimiento",
+      "Severity": "Low",
+      "HumanDescription": "Tu PC tarda mucho en arrancar. Un Windows 10 limpio deberia arrancar en menos de 30 segundos con SSD o 60 segundos con disco duro. Un arranque lento que empeora puede indicar demasiados programas al inicio o un disco fallando.",
+      "HumanImpact": "Perdida de productividad y posible indicador de fallo de hardware.",
+      "FixSteps": [
+        "Abrir Administrador de Tareas (Ctrl+Shift+Esc) > Pestana Inicio.",
+        "Deshabilitar los programas de inicio con impacto 'Alto' que no uses.",
+        "Ejecutar 'chkdsk C: /scan' si el arranque empeora progresivamente."
+      ],
+      "FixCommand": "Start-Process taskmgr.exe",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "STAB_SLOW_BOOT_CRASHES",
+      "Category": "Hardware",
+      "Severity": "High",
+      "HumanDescription": "Tu PC arranca muy lento Y se ha apagado brutalmente varias veces. Esta combinacion es la senal tipica de un disco duro que empieza a fallar.",
+      "HumanImpact": "Si no se actua, el disco puede fallar completamente y perderse todos los datos permanentemente.",
+      "FixSteps": [
+        "URGENTE: Descargar CrystalDiskInfo (gratis) y ver si el estado SMART es 'Precaucion' o 'Malo'.",
+        "Hacer copia de seguridad AHORA de todos los datos importantes.",
+        "Ejecutar 'chkdsk C: /f /r' y reiniciar para reparar sectores malos.",
+        "Si el chkdsk encuentra errores, planificar cambio de disco urgente."
+      ],
+      "FixCommand": "Start-Process 'https://crystalmark.info/en/software/crystaldiskinfo/'",
+      "FixDifficulty": "Hard",
+      "Safe": true
+    },
+    {
+      "ID": "STAB_WHEA_ERRORS",
+      "Category": "Hardware",
+      "Severity": "High",
+      "HumanDescription": "Se han detectado errores de hardware fisico. WHEA reporta fallos electronicos reales: cuando el procesador, RAM o GPU tienen un problema electrico. Estos no son fallos de software.",
+      "HumanImpact": "Pueden causar inestabilidad, datos corruptos o fallos irreparables del hardware.",
+      "FixSteps": [
+        "Comprobar si el PC esta overclockado y desactivarlo si es asi.",
+        "Verificar la memoria RAM con MemTest86 (gratis, booteable desde USB).",
+        "Si el fallo es en la CPU: revisar voltajes y refrigeracion."
+      ],
+      "FixCommand": "Start-Process 'https://www.memtest86.com/'",
+      "FixDifficulty": "Hard",
+      "Safe": true
+    },
+    {
+      "ID": "STAB_SMART_PREDICT_FAIL",
+      "Category": "Hardware",
+      "Severity": "Critical",
+      "HumanDescription": "El propio disco duro esta prediciendo su fallo inminente a traves de su sistema de autodiagnostico SMART. Es como cuando el coche te avisa con una luz roja de que algo va muy mal.",
+      "HumanImpact": "El disco puede fallar en horas, dias o semanas. Una vez que falla, los datos son irrecuperables sin pagar a una empresa de recuperacion.",
+      "FixSteps": [
+        "CRITICO: Hacer copia de seguridad de todos los datos AHORA mismo.",
+        "No apagar el PC hasta tener el backup completado.",
+        "Reemplazar el disco lo antes posible."
+      ],
+      "FixCommand": "Start-Process 'https://crystalmark.info/en/software/crystaldiskinfo/'",
+      "FixDifficulty": "Hard",
+      "Safe": true
+    },
+    {
+      "ID": "JUNK_TEMP_FILES",
+      "Category": "Limpieza",
+      "Severity": "Low",
+      "HumanDescription": "Tu PC tiene acumulados mas de 1GB de archivos temporales: restos de instalaciones, actualizaciones y caches que ya no sirven para nada.",
+      "HumanImpact": "Ocupan espacio innecesariamente. No es riesgo de seguridad, pero si limpieza pendiente.",
+      "FixSteps": [
+        "Escribir 'cleanmgr' en el buscador de Windows y ejecutarlo como administrador.",
+        "Marcar todas las casillas y hacer clic en 'Aceptar'."
+      ],
+      "FixCommand": "Start-Process cleanmgr.exe -Verb RunAs",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "JUNK_BROKEN_ARP",
+      "Category": "Limpieza",
+      "Severity": "Low",
+      "HumanDescription": "Hay programas en la lista de 'Agregar o quitar programas' cuya carpeta de instalacion ya no existe. Son entradas rotas en el Registro.",
+      "HumanImpact": "Ralentizan el Panel de Control y pueden causar conflictos al reinstalar software.",
+      "FixSteps": [
+        "Descargar Revo Uninstaller (gratis).",
+        "Escanear y eliminar los restos de programas desinstalados."
+      ],
+      "FixCommand": "Start-Process 'https://www.revouninstaller.com/'",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "WIFI_OPEN_PROFILE",
+      "Category": "Red",
+      "Severity": "Medium",
+      "HumanDescription": "Tu PC tiene guardadas redes WiFi sin contrasena ni cifrado. Cada vez que pases cerca, tu PC se conectara automaticamente. En redes abiertas, toda tu navegacion es visible.",
+      "HumanImpact": "Robo de sesiones, sniffing de trafico no cifrado, posibilidad de Evil Twin (red falsa del mismo nombre).",
+      "FixSteps": [
+        "Ir a Configuracion > Red e Internet > WiFi > Administrar redes conocidas.",
+        "Eliminar todas las redes abiertas que no reconozcas o que ya no uses."
+      ],
+      "FixCommand": "Start-Process ms-settings:network-wifi",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "WIFI_WEAK_CIPHER",
+      "Category": "Red",
+      "Severity": "High",
+      "HumanDescription": "Tienes guardada una red WiFi que usa cifrado WEP o WPA1. Protocolos de hace 20 anos que se rompen en minutos con un portatil normal.",
+      "HumanImpact": "Cualquier persona cercana puede descifrar todo tu trafico de esa red con herramientas gratuitas.",
+      "FixSteps": [
+        "Entrar en la configuracion del router (normalmente en 192.168.1.1).",
+        "Cambiar el protocolo de seguridad a WPA2 o WPA3.",
+        "Reconectar todos los dispositivos con la nueva configuracion."
+      ],
+      "FixCommand": "Start-Process 'http://192.168.1.1'",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "USB_MANY_DEVICES",
+      "Category": "Inventario",
+      "Severity": "Low",
+      "HumanDescription": "Se han conectado muchos dispositivos USB de almacenamiento a tu PC. Windows guarda un registro de cada uno. Informativo principalmente.",
+      "HumanImpact": "En entornos corporativos, indica posibles transferencias de datos no controladas. En casa, es generalmente inofensivo.",
+      "FixSteps": [
+        "Si quieres gestionar o limpiar el historial: descargar USBDeview (gratis de Nirsoft).",
+        "No requiere accion inmediata en uso domestico."
+      ],
+      "FixCommand": "Start-Process 'https://www.nirsoft.net/utils/usb_devices_view.html'",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "FT_SHIMCACHE_SUSPICIOUS",
+      "Category": "Forense",
+      "Severity": "Medium",
+      "HumanDescription": "El registro de compatibilidad de Windows muestra nombres de archivos que coinciden con herramientas de hacking. Puede indicar que se ejecutaron en el pasado aunque ya no esten instaladas.",
+      "HumanImpact": "No es confirmacion de compromiso, pero si una senal de alerta que requiere investigacion.",
+      "FixSteps": [
+        "Revisar el listado de ejecutables sospechosos en la evidencia del hallazgo.",
+        "Buscar en Google si alguno de esos nombres corresponde a malware conocido.",
+        "Ejecutar analisis completo con Windows Defender en modo sin conexion."
+      ],
+      "FixCommand": "Start-Process ms-settings:windowssecurity",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "UA_GHOST_EXECUTION",
+      "Category": "Forense",
+      "Severity": "High",
+      "HumanDescription": "Un programa se ejecuto en tu PC y despues desaparecio del disco. Windows registra todo lo que ejecutas y ese registro muestra algo que corrio desde una carpeta sospechosa y luego fue borrado. Esto es exactamente lo que hace el malware moderno.",
+      "HumanImpact": "Ejecucion de malware, instalacion de backdoors o robo de datos sin dejar rastro visible.",
+      "FixSteps": [
+        "Ejecutar un analisis completo con Windows Defender en modo sin conexion.",
+        "Revisar si hay programas nuevos en el inicio (Administrador de Tareas > Inicio).",
+        "Cambiar contrasenas de cuentas importantes si no reconoces la actividad."
+      ],
+      "FixCommand": "Start-Process ms-settings:windowssecurity",
+      "FixDifficulty": "Hard",
+      "MitreTechnique": "T1070",
+      "Safe": true
+    },
+    {
+      "ID": "UA_SUSPICIOUS_PATH_EXEC",
+      "Category": "Forense",
+      "Severity": "Medium",
+      "HumanDescription": "Hay programas que se han ejecutado desde carpetas temporales o de descargas. Puede ser un instalador temporal inofensivo o malware que se ejecuto sin instalarse correctamente.",
+      "HumanImpact": "Ejecucion de codigo no autorizado desde ubicaciones de alto riesgo.",
+      "FixSteps": [
+        "Revisar la lista de ejecutables en la evidencia del hallazgo.",
+        "Si no reconoces alguno, buscarlo en Google o escanearlo con Defender.",
+        "Vaciar la carpeta de Descargas de archivos que ya no necesites."
+      ],
+      "FixCommand": "Start-Process ms-settings:windowssecurity",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "FW_LEGACY_BIOS",
+      "Category": "Firmware",
+      "Severity": "Medium",
+      "HumanDescription": "Tu PC usa una tecnologia de arranque antigua (BIOS) en lugar de la moderna (UEFI). No puedes activar Secure Boot ni otras protecciones importantes. Eres mas vulnerable a ciertos virus que infectan el proceso de arranque.",
+      "HumanImpact": "Incapacidad para activar protecciones modernas como Secure Boot.",
+      "FixSteps": [
+        "Entrar en la BIOS al arrancar (F2, F12 o Supr segun el fabricante).",
+        "Buscar 'Boot Mode' o 'BIOS Mode' y cambiar de Legacy/CSM a UEFI.",
+        "Advertencia: puede requerir reinstalar Windows."
+      ],
+      "FixCommand": "Start-Process 'ms-settings:recovery'",
+      "FixDifficulty": "Hard",
+      "Safe": true
+    },
+    {
+      "ID": "FW_SECUREBOOT_DISABLED",
+      "Category": "Firmware",
+      "Severity": "High",
+      "HumanDescription": "Tu PC tiene UEFI moderno pero Secure Boot esta apagado. Es como tener alarma en casa pero dejarla siempre desactivada. Un virus podria instalarse en el proceso de arranque y sobrevivir incluso si formateas.",
+      "HumanImpact": "Malware de tipo bootkit puede persistir tras formateo completo.",
+      "FixSteps": [
+        "Reiniciar el PC y entrar en la BIOS/UEFI (F2, F12 o Supr).",
+        "Buscar la opcion 'Secure Boot' y activarla.",
+        "Guardar y reiniciar."
+      ],
+      "FixCommand": "Start-Process 'ms-settings:recovery'",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "FW_PKFAIL_DETECTED",
+      "Category": "Firmware",
+      "Severity": "Critical",
+      "HumanDescription": "Tu PC tiene el fallo critico PKfail (CVE-2024-8105). La llave maestra de Secure Boot es publica y conocida. Cualquiera puede saltarse completamente la proteccion e instalar malware invisible en el firmware.",
+      "HumanImpact": "Bypass total de Secure Boot. Malware que sobrevive a formateos completos.",
+      "FixSteps": [
+        "URGENTE: Visitar la web del fabricante de tu PC.",
+        "Buscar y descargar la ultima actualizacion de BIOS/UEFI.",
+        "Verificar en pkfail.com si tu modelo especifico esta afectado."
+      ],
+      "FixCommand": "Start-Process 'https://pkfail.com'",
+      "FixDifficulty": "Hard",
+      "Safe": true
+    },
+    {
+      "ID": "SHARE_EVERYONE_WRITE",
+      "Category": "Red",
+      "Severity": "High",
+      "HumanDescription": "Tienes una carpeta compartida en red que cualquier persona conectada a tu WiFi puede modificar libremente sin contrasena. Un ransomware en otro equipo de tu red puede cifrar todos esos archivos automaticamente.",
+      "HumanImpact": "Exposicion total de archivos compartidos a cualquier usuario de la red, incluyendo malware.",
+      "FixSteps": [
+        "Clic derecho en la carpeta compartida > Propiedades > Compartir.",
+        "Uso compartido avanzado > Permisos.",
+        "Quitar 'Todos' o cambiar el permiso de 'Control total' a 'Solo lectura'."
+      ],
+      "FixCommand": "Start-Process 'control.exe' -ArgumentList 'folders'",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "VSS_NO_SHADOWS",
+      "Category": "Backup",
+      "Severity": "High",
+      "HumanDescription": "Windows puede guardar automaticamente versiones anteriores de tus archivos. Ahora mismo esa funcion esta desactivada. Si un ransomware cifra tus archivos o borras algo por accidente, no podras recuperarlo.",
+      "HumanImpact": "Sin Shadow Copies ni backup externo, la perdida de datos ante ransomware es permanente.",
+      "FixSteps": [
+        "Buscar 'Crear un punto de restauracion' en el buscador de Windows.",
+        "Seleccionar el disco C: y hacer clic en 'Configurar'.",
+        "Activar la proteccion con un 5-10% de espacio en disco."
+      ],
+      "FixCommand": "Start-Process SystemPropertiesProtection.exe",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "DNS_NO_DOH",
+      "Category": "Privacidad",
+      "Severity": "Low",
+      "HumanDescription": "Cada vez que escribes la direccion de una web, tu PC hace una consulta DNS que viaja en texto plano. Tu proveedor de internet puede ver exactamente que sitios visitas aunque la conexion sea HTTPS.",
+      "HumanImpact": "El proveedor y observadores en la red pueden crear un perfil de tu actividad online.",
+      "FixSteps": [
+        "En Chrome: Configuracion > Privacidad > Seguridad > Usar DNS seguro.",
+        "En Firefox: Configuracion > Privacidad > DNS sobre HTTPS.",
+        "En Windows 11: Configuracion > Red > Hardware de red > Propiedades del adaptador > Servidor DNS preferido > activar DoH."
+      ],
+      "FixCommand": "Start-Process ms-settings:network",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "DNS_UNKNOWN_SERVER",
+      "Category": "Red",
+      "Severity": "High",
+      "HumanDescription": "Tu PC esta usando servidores DNS desconocidos. Estos podrian enviarte a copias falsas de tu banco o correo aunque escribas la direccion correcta (DNS hijacking).",
+      "HumanImpact": "Redireccion a sitios maliciosos, phishing facilitado a nivel de red.",
+      "FixSteps": [
+        "Ir a Configuracion del adaptador de red.",
+        "Propiedades > TCP/IPv4 > Propiedades.",
+        "Establecer DNS preferido a 1.1.1.1 (Cloudflare) y alternativo a 8.8.8.8 (Google)."
+      ],
+      "FixCommand": "Start-Process 'ncpa.cpl'",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "HV_RUNNING_IN_VM",
+      "Category": "Virtualizacion",
+      "Severity": "Low",
+      "HumanDescription": "Este PC es una maquina virtual que corre dentro de otro PC real. La seguridad del PC anfitrion que la contiene es igual de importante. Si ese PC se compromete, esta VM tambien.",
+      "HumanImpact": "Dependencia de seguridad en el sistema anfitrion.",
+      "FixSteps": [
+        "Ejecutar HoloScan tambien en el PC fisico anfitrion para tener la vision completa."
+      ],
+      "FixCommand": "Start-Process ms-settings:windowssecurity",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "HV_WSL_ACTIVE",
+      "Category": "Virtualizacion",
+      "Severity": "Low",
+      "HumanDescription": "Tu PC tiene Linux instalado dentro de Windows (WSL). Si no lo usas activamente, es superficie de ataque innecesaria.",
+      "HumanImpact": "Bajo si bien configurado. Medio si hay servicios de red corriendo en WSL sin saberlo.",
+      "FixSteps": [
+        "Si no lo usas: Configuracion > Aplicaciones > Caracteristicas opcionales.",
+        "Buscar 'Subsistema de Windows para Linux' y desactivarlo."
+      ],
+      "FixCommand": "Start-Process ms-settings:optionalfeatures",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "LADMIN_UNKNOWN_ADMIN",
+      "Category": "Cuentas",
+      "Severity": "High",
+      "HumanDescription": "Hay cuentas con poderes de administrador total que no son las habituales. Los hackers crean cuentas ocultas de administrador para poder volver cuando quieran.",
+      "HumanImpact": "Control total del PC por parte de un actor no autorizado.",
+      "FixSteps": [
+        "Abrir Administracion de equipos > Usuarios y grupos locales > Grupos > Administradores.",
+        "Verificar que reconoces TODOS los usuarios listados.",
+        "Eliminar inmediatamente cualquier cuenta que no reconozcas del grupo."
+      ],
+      "FixCommand": "Start-Process lusrmgr.msc",
+      "FixDifficulty": "Medium",
+      "MitreTechnique": "T1136",
+      "Safe": true
+    },
+    {
+      "ID": "LADMIN_BUILTIN_ENABLED",
+      "Category": "Cuentas",
+      "Severity": "Medium",
+      "HumanDescription": "La cuenta de administrador de fabrica de Windows (Administrator) esta activa. Los hackers la atacan especificamente porque siempre existe y tiene poderes maximos.",
+      "HumanImpact": "Objetivo prioritario para ataques automatizados de contrasenas.",
+      "FixSteps": [
+        "Buscar 'Administracion de equipos' en Windows.",
+        "Ir a Herramientas del sistema > Usuarios y grupos locales > Usuarios.",
+        "Clic derecho en Administrator > Deshabilitar."
+      ],
+      "FixCommand": "Start-Process lusrmgr.msc",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "PRINT_NIGHTHMARE_VULN",
+      "Category": "Servicios",
+      "Severity": "Critical",
+      "HumanDescription": "El servicio de impresion Print Spooler tiene una configuracion que permite que cualquier programa se convierta en administrador total del PC. Esta es la vulnerabilidad PrintNightmare.",
+      "HumanImpact": "Cualquier programa o usuario puede obtener control total del PC aprovechando esta configuracion.",
+      "FixSteps": [
+        "Si no necesitas imprimir en red: Servicios de Windows > Print Spooler > Detener y deshabilitar.",
+        "Si necesitas imprimir: aplicar el parche KB5005033 desde Windows Update.",
+        "Deshabilitar 'Aceptar trabajos de impresion de clientes' en la politica de grupo."
+      ],
+      "FixCommand": "Start-Process services.msc",
+      "FixDifficulty": "Hard",
+      "MitreTechnique": "T1547",
+      "Safe": true
+    },
+    {
+      "ID": "PRINT_SPOOLER_UNNECESSARY",
+      "Category": "Servicios",
+      "Severity": "Low",
+      "HumanDescription": "El servicio de impresion esta activo aunque no tienes impresoras de red. Este servicio ha tenido muchos problemas de seguridad historicamente.",
+      "HumanImpact": "Superficie de ataque innecesaria.",
+      "FixSteps": [
+        "Abrir Servicios de Windows (services.msc).",
+        "Buscar 'Print Spooler', clic derecho > Propiedades.",
+        "Cambiar tipo de inicio a 'Deshabilitado' y detener el servicio."
+      ],
+      "FixCommand": "Start-Process services.msc",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "CVE_INTEL_KEV",
+      "Category": "CVE",
+      "Severity": "Critical",
+      "HumanDescription": "Tienes un programa instalado con una vulnerabilidad que los hackers estan usando activamente ahora mismo. Esta en la lista oficial del gobierno de EEUU (CISA KEV) de vulnerabilidades bajo explotacion activa.",
+      "HumanImpact": "Hay grupos de ransomware y hackers organizados usando esta vulnerabilidad para atacar ordenadores.",
+      "FixSteps": [
+        "Actualizar el programa afectado a su ultima version lo antes posible.",
+        "Si el programa no tiene actualizacion disponible: desinstalarlo temporalmente.",
+        "Verificar que Windows Update este al dia."
+      ],
+      "FixCommand": "Start-Process ms-settings:windowsupdate",
+      "FixDifficulty": "Easy",
+      "MitreTechnique": "T1190",
+      "Safe": true
+    },
+    {
+      "ID": "CVE_INTEL_KNOWN",
+      "Category": "CVE",
+      "Severity": "Medium",
+      "HumanDescription": "Tienes programas con vulnerabilidades conocidas que aun no se usan masivamente en ataques, pero que podrian serlo. Mantener el software actualizado es la defensa principal.",
+      "HumanImpact": "Exposicion a exploits publicamente conocidos.",
+      "FixSteps": [
+        "Actualizar todos los programas afectados a sus versiones mas recientes.",
+        "Considerar activar las actualizaciones automaticas en cada programa."
+      ],
+      "FixCommand": "Start-Process ms-settings:windowsupdate",
+      "FixDifficulty": "Easy",
+      "Safe": true
+    },
+    {
+      "ID": "SC_UNSIGNED_PERSISTENCE",
+      "Category": "Persistencia",
+      "Severity": "High",
+      "HumanDescription": "Hay un programa que se abre automaticamente con Windows y no tiene firma digital. El software legitimo siempre esta firmado. Sin firma es como un medicamento sin prospecto ni marca.",
+      "HumanImpact": "Un ejecutable sin firma en el inicio automatico es una de las senales mas claras de software sospechoso o malware.",
+      "FixSteps": [
+        "Descargar Autoruns de Sysinternals (gratis y oficial de Microsoft).",
+        "Revisar todos los elementos del inicio marcados en rojo o sin firma.",
+        "Investigar en Google cualquiera que no reconozcas antes de eliminarlo."
+      ],
+      "FixCommand": "Start-Process 'https://learn.microsoft.com/en-us/sysinternals/downloads/autoruns'",
+      "FixDifficulty": "Medium",
+      "MitreTechnique": "T1547",
+      "Safe": true
+    },
+    {
+      "ID": "SC_UNTRUSTED_SIGNATURE",
+      "Category": "Persistencia",
+      "Severity": "Medium",
+      "HumanDescription": "Hay programas en el inicio de Windows con firma digital invalida (expirada, revocada o autofirmada). Una firma autofirmada la puede crear cualquiera y no garantiza legitimidad.",
+      "HumanImpact": "Puede ser software legitimo antiguo o software sospechoso que intenta parecer seguro.",
+      "FixSteps": [
+        "Verificar que reconoces cada programa listado en la evidencia.",
+        "Buscar en Google el nombre del ejecutable para confirmar su legitimidad.",
+        "Si no lo reconoces: usar Autoruns de Sysinternals para eliminarlo del inicio."
+      ],
+      "FixCommand": "Start-Process taskmgr.exe",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    },
+    {
+      "ID": "OPTFEAT_SMBV1",
+      "Category": "Red",
+      "Severity": "Critical",
+      "HumanDescription": "Tienes activado SMBv1, el protocolo que uso el ransomware WannaCry en 2017 para infectar cientos de miles de ordenadores. Cualquier equipo en tu red con el exploit EternalBlue puede comprometerte.",
+      "HumanImpact": "Vulnerable al exploit mas usado en la historia del ransomware.",
+      "FixSteps": [
+        "Abrir PowerShell como administrador.",
+        "Ejecutar: Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart",
+        "Reiniciar el PC."
+      ],
+      "FixCommand": "Disable-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -NoRestart",
+      "FixDifficulty": "Medium",
+      "MitreTechnique": "T1210",
+      "Safe": true
+    },
+    {
+      "ID": "OPTFEAT_PSV2",
+      "Category": "Auditoria",
+      "Severity": "Medium",
+      "HumanDescription": "Tienes instalada una version antigua de PowerShell que los hackers usan para saltarse las protecciones de la version moderna, incluyendo el sistema de logging de actividad.",
+      "HumanImpact": "Permite evadir el registro de auditoria de PowerShell y ejecutar codigo malicioso sin dejar rastro.",
+      "FixSteps": [
+        "Abrir PowerShell como administrador.",
+        "Ejecutar: Disable-WindowsOptionalFeature -Online -FeatureName MicrosoftWindowsPowerShellV2Root -NoRestart",
+        "Reiniciar el PC."
+      ],
+      "FixCommand": "Disable-WindowsOptionalFeature -Online -FeatureName MicrosoftWindowsPowerShellV2Root -NoRestart",
+      "FixDifficulty": "Medium",
+      "MitreTechnique": "T1059.001",
+      "Safe": true
+    },
+    {
+      "ID": "EXECUTION_POLICY_BYPASS",
+      "Category": "Comportamiento",
+      "Severity": "Medium",
+      "HumanDescription": "El historial de PowerShell muestra el uso de 'ExecutionPolicy bypass'. Esto permite saltarse las protecciones de ejecucion de scripts firmados en Windows y es una tecnica tipica de atacantes para correr malware en memoria.",
+      "HumanImpact": "Medio-Alto. Requiere revisar si estos comandos fueron ejecutados por ti o por alguien o algo sin tu autorizacion.",
+      "FixSteps": [
+        "Revisar el historial completo con el comando que aparecer abajo.",
+        "Identificar si reconoces cada uno de los comandos listados.",
+        "Si no reconoces alguno: cambiar contrasenas importantes y ejecutar un analisis completo de Defender."
+      ],
+      "FixCommand": "Get-Content \"$env:APPDATA\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt\" | Select-String -Pattern 'Invoke-Expression|IEX|DownloadString|-enc|bypass'",
+      "FixDifficulty": "Hard",
+      "MitreTechnique": "T1059.001",
       "Safe": true
     }
   ]
