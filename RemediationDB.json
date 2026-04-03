@@ -1,0 +1,27 @@
+{
+  "Remediaciones": [
+    {
+      "ID": "EXECUTION_POLICY_BYPASS",
+      "HumanDescription": "El historial de PowerShell (o procesos activos) demuestra el uso del patrón 'ExecutionPolicy bypass'. Esto permite saltarse las protecciones de ejecución de scripts firmados en Windows y es una técnica típica de atacantes (ATT&CK T1059.001) para correr malware en memoria.",
+      "FixSteps": [
+        "Revisar historial: Get-Content $env:APPDATA\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt",
+        "Si no reconoces el comando ejecutado, podrías estar comprometido. Limpia el historial.",
+        "Cambiar las contraseñas guardadas en los navegadores si se sospecha filtración."
+      ],
+      "FixCommand": "Get-Content \"$env:APPDATA\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt\" | Select-String -Pattern 'Invoke-Expression|IEX|DownloadString|-enc|bypass'",
+      "FixDifficulty": "Hard",
+      "Safe": true
+    },
+    {
+      "ID": "NETD_NETBIOS_ENABLED",
+      "HumanDescription": "NetBIOS es una tecnología de red de los años 90 que Windows sigue usando. Es como dejar una puerta trasera abierta en tu router permitiendo descubrimiento en red de forma insegura.",
+      "FixSteps": [
+        "Desactivar NetBIOS en la configuración del adaptador de red (WINS).",
+        "Modificar la clave de registro de NetBT en Tcpip."
+      ],
+      "FixCommand": "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Services\\NetBT\\Parameters' -Name 'NodeType' -Value 2",
+      "FixDifficulty": "Medium",
+      "Safe": true
+    }
+  ]
+}
